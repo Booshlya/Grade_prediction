@@ -1,0 +1,376 @@
+# Libraries installation
+#---------------------------------------------
+install.packages("ggplot2")
+library(ggplot2)
+
+install.packages("EnvStats")
+library(EnvStats)
+
+install.packages("beeswarm")
+library(beeswarm)
+
+install.packages("lawstat")
+library(lawstat)
+
+# Load the car package for the leveneTest function
+install.packages("car")
+library(car)
+
+# Reading Data
+#---------------------------------------------
+Por <- read.table("student-por.csv", sep = ";", header = TRUE)
+Math <- read.table("student-mat.csv", sep = ";", header = TRUE)
+
+
+#checking data
+head(Por)
+
+head(Math)
+
+# Explanatory Analysis
+#---------------------------------------------
+
+# Summary statistics for traveltime in the Portuguese dataset
+summary(Por$traveltime)
+
+# Summary statistics for studytime in the Portuguese dataset
+summary(Por$studytime)
+
+
+
+# Summary statistics for traveltime in the Math dataset
+summary(Math$traveltime)
+
+# Summary statistics for studytime in the Math dataset
+summary(Math$studytime)
+
+
+# Now, i'd like to see number of records from different schools
+
+# creating a function to count records
+count_records_by_school <- function(data) {
+  school_counts <- table(data$school)
+  return(school_counts)
+}
+
+
+school_counts <- count_records_by_school(Math)
+print(school_counts)
+
+# applying function one more time
+school_counts <- count_records_by_school(Por)
+print(school_counts)
+
+# Data visualization
+
+
+# Create a data frame containing G1, G2, and G3
+data_df <- data.frame(
+  Variable = rep(c("G1", "G2", "G3"), each = length(Math$G1)),
+  Value = c(Math$G1, Math$G2, Math$G3)
+)
+
+# Create a paired histogram
+paired_histogram <- ggplot(data_df, aes(x = Value, fill = Variable)) +
+  geom_histogram(binwidth = 1, position = "dodge") +
+  labs(title = "Distribution of G1, G2, and G3 Scores for Math", x = "Score") +
+  scale_fill_manual(values = c("G1" = "azure", "G2" = "darksalmon", "G3" = "darkseagreen")) +
+  theme_dark()
+
+
+print(paired_histogram)
+
+
+
+
+# Create a data frame containing G1, G2, and G3
+data_df <- data.frame(
+  Variable = rep(c("G1", "G2", "G3"), each = length(Por$G1)),
+  Value = c(Por$G1, Por$G2, Por$G3)
+)
+
+# Create a paired histogram
+paired_histogram <- ggplot(data_df, aes(x = Value, fill = Variable)) +
+  geom_histogram(binwidth = 1, position = "dodge") +
+  labs(title = "Distribution of G1, G2, and G3 Scores for Portuguese ", x = "Score") +
+  scale_fill_manual(values = c("G1" = "azure", "G2" = "darksalmon", "G3" = "darkseagreen")) +
+  theme_dark()
+
+
+print(paired_histogram)
+
+#let's check  G3 and studytime
+# scatter plot for study time vs. final grade (G3)
+plot(Por$studytime, Por$G3, main = "Scatter Plot of Study Time(Portuguese) vs. G3", xlab = "Study Time", ylab = "G3")
+
+
+#now, i will check travel time
+# scatter plot for study time vs. final grade (G3)
+plot(Por$traveltime, Por$G3, main = "Scatter Plot of Travel Time(Portuguese) vs. G3", xlab = "Travel Time", ylab = "G3")
+
+
+# 1 Sample Tests
+#---------------------------------------------
+
+#since i'm dealing with studytime, let's check distribution of it
+# Shapiro-Wilk test for normality of Por Study time
+shapiro_test_result <- shapiro.test(Por$studytime)
+print(shapiro_test_result)
+
+#Distribution is not normal, so let's check symmetry
+symmetry.test(Por$studytime)
+
+
+#now i can do permutation test to check mean of study time
+oneSamplePermutationTest(Por$studytime, mu = 3, alternative = 'less')
+
+
+#proportion test 
+
+#here i will define successes as desire for higher edication
+# Number of successes (students interested in higher education)
+successes <- sum(Por$higher == "yes")
+
+# Total number of trials (total number of students)
+total_trials <- length(Por$higher)
+
+# We can do the test
+binom.test(successes, total_trials, p=0.75, alternative = 'less')
+
+# we can also use the approximation
+prop.test(successes, total_trials, p=0.75, , alternative = 'less')
+
+
+
+#2 Samples tests
+#---------------------------------------------
+#Comparing study time of students from different schools
+
+# Shapiro-Wilk test for normality
+shapiro_test_GP <- shapiro.test(Por$studytime[ Por$school == "GP" ])
+shapiro_test_MS <- shapiro.test(Por$studytime[ Por$school == "MS" ])
+
+print(shapiro_test_GP)
+print(shapiro_test_MS)
+
+
+# Visual inspection of the study time distribution for each school
+par(mfrow = c(2, 2)) 
+
+# Histograms
+hist(Por$studytime[ Por$school == "GP" ], main = "School GP", col = "lightblue", xlim = c(1, 4))
+hist(Por$studytime[ Por$school == "MS" ], main = "School MS", col = "lightgreen", xlim = c(1, 4))
+
+
+
+# not normal distribution, checking symmetry
+symmetry.test(Por$studytime[ Por$school == "GP" ])
+
+symmetry.test(Por$studytime[ Por$school == "MS" ])
+
+#but i cannot run permutation test for 2 samples, so i will use Wilcoxon test as #we agreed in class
+
+wilcoxon_test_result <- wilcox.test(studytime ~ school, data = Por,   exact = FALSE)
+print(wilcoxon_test_result)
+
+
+#comparing groups with different travel time by grades
+
+# we have grades from 0 to 20, so i will define a good grade to be greater than 14, meaning it is 15+, like an upper quartile
+threshold_grade <- 14
+Por$good_grade <- ifelse(Por$G3 > threshold_grade, 1, 0)
+
+
+# Create a binary indicator for small travel time
+threshold_travel <- 3
+Por$small_travel_time <- ifelse(Por$traveltime <= threshold_travel, 1, 0)
+Por$small_travel_time
+
+# Proportion test
+prop_test_good_grades <- prop.test(table(Por$good_grade, Por$small_travel_time))
+print(prop_test_good_grades)
+
+# 3 Samples tests
+#-------------------------------
+#from here, i'm dealing only with GP schools from Portuguese data set
+
+# Create a subset of Por with records where school is 'GP'
+Por_GP <- subset(Por, school == 'GP')
+
+# Histogram for the distribution of G3
+hist(Por_GP$G3, main = "Distribution of Final Grades (G3)", xlab = "G3 Grades", col = "lightblue", border = "black")
+
+
+# Calculate quartiles for G3
+quartiles_G3 <- quantile(Por_GP$G3, c(0, 0.25, 0.5, 0.75, 1))
+
+# Display quartile values
+print(quartiles_G3)
+
+
+# include groups, using cut method
+Por_GP$G3_groups <- cut(Por_GP$G3, breaks = c(-Inf, 9, 12, 16, 20), labels = c("low", "satisfactory", "good", "excellent"), include.lowest = TRUE)
+
+# Print the relevant columns to check
+print(head(Por_GP[, c("G3", "G3_groups")]))
+
+
+# Print the relevant columns to check
+print(tail(Por_GP[, c("G3", "G3_groups")]))
+
+
+# Shapiro-Wilk test for normality within each group
+shapiro_test_low <- shapiro.test(Por_GP$goout[Por_GP$G3_groups == "low"])
+shapiro_test_satisfactory <- shapiro.test(Por_GP$goout[Por_GP$G3_groups == "satisfactory"])
+shapiro_test_good <- shapiro.test(Por_GP$goout[Por_GP$G3_groups == "good"])
+shapiro_test_excellent <- shapiro.test(Por_GP$goout[Por_GP$G3_groups == "excellent"])
+
+# Print the results
+print(shapiro_test_low)
+print(shapiro_test_satisfactory)
+print(shapiro_test_good)
+print(shapiro_test_excellent)
+
+
+# Kruskal-Wallis test for goout across G3 groups
+kruskal_test_result <- kruskal.test(goout ~ G3_groups, data = Por_GP)
+
+# Print the results
+print(kruskal_test_result)
+
+
+# checking variances of failures among groups of absences
+
+# Create a histogram for the distribution of absences
+hist(Por_GP$absences, main = "Histogram of Absences", xlab = "Absences")
+
+
+# Calculate quartiles for G3
+quartiles_Absc <- quantile(Por_GP$absences, c(0, 0.25, 0.5, 0.75, 1))
+
+# Display quartile values
+print(quartiles_Absc)
+
+
+# Create a factor variable based on the new groups
+Por_GP$absences_groups <- cut(Por_GP$absences, breaks = c(-Inf, 2, 4, Inf), labels = c("Low", "Medium", "High"), include.lowest = TRUE)
+
+# Perform Levene's test
+levene_test_result <- leveneTest(Por_GP$failures ~ Por_GP$absences_groups)
+
+# Print the results
+print(levene_test_result)
+
+
+# Regression
+#---------------------------------
+# Create a base linear model
+base_model <- lm(G3 ~ traveltime + studytime, data = Por_GP)
+
+# Summarize the model
+summary(base_model)
+
+
+
+# Create a base2 linear model
+model_2 <- lm(G3 ~ traveltime + studytime +  absences, data = Por_GP)
+
+# Summarize the model
+summary(model_2)
+
+
+
+
+
+# Create a base3 linear model
+model_3 <- lm(G3 ~ traveltime + studytime +  absences + goout , data = Por_GP)
+
+# Summarize the model
+summary(model_3)
+
+
+
+# Create a baseMAX linear model
+model_MAX <- lm(G3 ~ traveltime + studytime + absences + age + failures + goout, data = Por_GP)
+
+# Summarize the model
+summary(model_MAX)
+
+
+
+#checking dependency with G1
+# Create a base linear model
+model_G1 <- lm(G3 ~ G1, data = Por_GP)
+
+# Summarize the model
+summary(model_G1)
+
+
+
+#next will be series of plotting using beeswarm library
+
+beeswarm(Por_GP$G3 ~ Por_GP$absences)
+
+beeswarm(Por_GP$G3 ~ Por_GP$failures)
+
+beeswarm(Por_GP$G3 ~ Por_GP$age)
+
+beeswarm(Por_GP$G3 ~ Por_GP$G1)
+
+beeswarm(Por_GP$G3 ~ Por_GP$G2)
+
+beeswarm(Por_GP$G3 ~ Por_GP$traveltime)
+
+beeswarm(Por_GP$G3 ~ Por_GP$studytime)
+
+beeswarm(Por_GP$G3 ~ Por_GP$goout)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
